@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(20 14.3% 4.1%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(20 14.3% 4.1%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(20 14.3% 4.1%);
+  --color-primary: hsl(142 60% 32%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(60 4.8% 95.9%);
+  --color-secondary-foreground: hsl(24 9.8% 10%);
+  --color-muted: hsl(60 4.8% 95.9%);
+  --color-muted-foreground: hsl(25 5.3% 44.7%);
+  --color-accent: hsl(60 4.8% 95.9%);
+  --color-accent-foreground: hsl(24 9.8% 10%);
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(60 9.1% 97.8%);
+  --color-border: hsl(20 5.9% 90%);
+  --color-input: hsl(20 5.9% 90%);
+  --color-ring: hsl(142 60% 32%);
+  --radius: 0.625rem;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-background: hsl(20 14.3% 4.1%);
+    --color-foreground: hsl(60 9.1% 97.8%);
+    --color-card: hsl(20 14.3% 6%);
+    --color-card-foreground: hsl(60 9.1% 97.8%);
+    --color-popover: hsl(20 14.3% 6%);
+    --color-popover-foreground: hsl(60 9.1% 97.8%);
+    --color-primary: hsl(142 55% 50%);
+    --color-primary-foreground: hsl(20 14.3% 4.1%);
+    --color-secondary: hsl(12 6.5% 15.1%);
+    --color-secondary-foreground: hsl(60 9.1% 97.8%);
+    --color-muted: hsl(12 6.5% 15.1%);
+    --color-muted-foreground: hsl(24 5.4% 63.9%);
+    --color-accent: hsl(12 6.5% 15.1%);
+    --color-accent-foreground: hsl(60 9.1% 97.8%);
+    --color-destructive: hsl(0 62.8% 45%);
+    --color-destructive-foreground: hsl(60 9.1% 97.8%);
+    --color-border: hsl(12 6.5% 18%);
+    --color-input: hsl(12 6.5% 18%);
+    --color-ring: hsl(142 55% 50%);
+  }
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+input,
+textarea,
+select {
+  font-size: 16px; /* prevent iOS zoom */
+}
