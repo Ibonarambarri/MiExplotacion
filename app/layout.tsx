@@ -17,12 +17,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Acienda",
-    template: "%s · Acienda",
+    default: "Mi Explotación",
+    template: "%s · Mi Explotación",
   },
   description: "Gestión ganadera personal — ovejas y conejas",
   manifest: "/manifest.webmanifest",
-  applicationName: "Acienda",
+  applicationName: "Mi Explotación",
   icons: {
     icon: [
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Acienda",
+    title: "Mi Explotación",
   },
   formatDetection: { telephone: false },
 };

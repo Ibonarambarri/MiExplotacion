@@ -11,6 +11,7 @@ import { Field } from "@/components/forms/field";
 import { animalStatusLabels } from "@/lib/validations";
 import type { ActionResult } from "@/actions/sheep";
 import type { Sheep, Rabbit } from "@/db/schema";
+import type { AnimalOption } from "@/lib/queries/animals-select";
 
 type SubmitAction = (
   prev: ActionResult | null,
@@ -24,6 +25,8 @@ export function AnimalForm({
   cancelHref,
   tagPlaceholder = "ES-0001",
   tagLabel = "Crotal",
+  motherOptions = [],
+  defaultMotherId,
 }: {
   action: SubmitAction;
   initial?: Sheep | Rabbit | null;
@@ -31,6 +34,9 @@ export function AnimalForm({
   cancelHref: string;
   tagPlaceholder?: string;
   tagLabel?: string;
+  /** Animales de la misma especie que pueden ser la madre. */
+  motherOptions?: AnimalOption[];
+  defaultMotherId?: number;
 }) {
   const [state, formAction, isPending] = useActionState<
     ActionResult | null,
@@ -60,14 +66,33 @@ export function AnimalForm({
         />
       </Field>
 
-      <Field label="Apodo" htmlFor="nickname" error={fe?.nickname}>
+      <Field label="Apodo" htmlFor="nickname" hint="Opcional" error={fe?.nickname}>
         <Input
           id="nickname"
           name="nickname"
           autoComplete="off"
           defaultValue={initial?.nickname ?? ""}
-          placeholder="(opcional)"
         />
+      </Field>
+
+      <Field
+        label="Madre"
+        htmlFor="motherId"
+        hint="Solo si nació en la explotación."
+        error={fe?.motherId}
+      >
+        <NativeSelect
+          id="motherId"
+          name="motherId"
+          defaultValue={String(initial?.motherId ?? defaultMotherId ?? "")}
+        >
+          <option value="">Sin madre registrada</option>
+          {motherOptions.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </NativeSelect>
       </Field>
 
       <Field

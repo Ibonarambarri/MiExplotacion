@@ -11,6 +11,7 @@ import {
   listRabbitOptions,
 } from "@/lib/queries/animals-select";
 
+export const metadata = { title: "Editar movimiento" };
 export const dynamic = "force-dynamic";
 
 export default async function EditarMovimientoPage({
@@ -33,7 +34,7 @@ export default async function EditarMovimientoPage({
 
   return (
     <div>
-      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1 h-8 px-2">
+      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1 h-11 px-2">
         <Link href="/finanzas">
           <ChevronLeft className="h-4 w-4" />
           Finanzas

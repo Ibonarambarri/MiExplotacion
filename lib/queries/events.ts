@@ -9,7 +9,7 @@ import {
   sheepDiseases,
   rabbitDiseases,
 } from "@/db/schema";
-import { and, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { addDaysIso, todayIso } from "@/lib/dates";
 
@@ -257,8 +257,27 @@ export async function listCalendarEvents(
   month: number, // 1-12
 ): Promise<CalendarEvent[]> {
   const from = `${year}-${String(month).padStart(2, "0")}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
+  // Día 0 del mes siguiente en UTC = último día del mes (independiente de la TZ del servidor).
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const to = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  return listEventsInRange(from, to);
+}
+
+/** Eventos de los próximos `days` días (hoy incluido) para la vista Agenda. */
+export async function listAgendaEvents(days = 60): Promise<CalendarEvent[]> {
+  const from = todayIso();
+  const events = await listEventsInRange(from, addDaysIso(from, days));
+  // En la agenda solo interesa lo que está por hacer o vigilar.
+  return events.filter(
+    (e) => e.type !== "enfermedad_fin" && e.type !== "parto_real",
+  );
+}
+
+/** Todos los eventos con fecha entre `from` y `to` (YYYY-MM-DD, inclusive). */
+export async function listEventsInRange(
+  from: string,
+  to: string,
+): Promise<CalendarEvent[]> {
 
   const inMonth = (col: AnyPgColumn) =>
     and(gte(col, from), lte(col, to));
@@ -348,7 +367,12 @@ export async function listCalendarEvents(
       })
       .from(sheepBreedings)
       .innerJoin(sheep, eq(sheep.id, sheepBreedings.sheepId))
-      .where(inMonth(sheepBreedings.expectedBirthDate)),
+      .where(
+        and(
+          isNull(sheepBreedings.actualBirthDate),
+          inMonth(sheepBreedings.expectedBirthDate),
+        ),
+      ),
     db
       .select({
         id: sheepBreedings.id,
@@ -376,7 +400,12 @@ export async function listCalendarEvents(
       })
       .from(rabbitBreedings)
       .innerJoin(rabbits, eq(rabbits.id, rabbitBreedings.rabbitId))
-      .where(inMonth(rabbitBreedings.expectedBirthDate)),
+      .where(
+        and(
+          isNull(rabbitBreedings.actualBirthDate),
+          inMonth(rabbitBreedings.expectedBirthDate),
+        ),
+      ),
     db
       .select({
         id: rabbitBreedings.id,
@@ -567,4 +596,98 @@ export async function listCalendarEvents(
 
   events.sort((a, b) => a.date.localeCompare(b.date));
   return events;
+}
+
+// ─── Vacunas vencidas ─────────────────────────────────────────────────────
+/**
+ * Próximas dosis con fecha ya pasada (hasta `daysBack` días atrás) de animales
+ * activos que no se han vuelto a vacunar del mismo tipo después.
+ */
+export async function listOverdueVaccines(
+  daysBack = 60,
+): Promise<VaccineEvent[]> {
+  const today = todayIso();
+  const since = addDaysIso(today, -daysBack);
+
+  const [sheepRows, rabbitRows] = await Promise.all([
+    db
+      .select({
+        id: sheepVaccines.id,
+        animalId: sheep.id,
+        tagId: sheep.tagId,
+        nickname: sheep.nickname,
+        type: sheepVaccines.type,
+        nextDoseDate: sheepVaccines.nextDoseDate,
+      })
+      .from(sheepVaccines)
+      .innerJoin(sheep, eq(sheep.id, sheepVaccines.sheepId))
+      .where(
+        and(
+          eq(sheep.status, "activo"),
+          isNotNull(sheepVaccines.nextDoseDate),
+          lt(sheepVaccines.nextDoseDate, today),
+          gte(sheepVaccines.nextDoseDate, since),
+          sql`not exists (select 1 from ${sheepVaccines} v2 where v2.sheep_id = ${sheepVaccines.sheepId} and v2.type = ${sheepVaccines.type} and v2.date > ${sheepVaccines.date})`,
+        ),
+      ),
+    db
+      .select({
+        id: rabbitVaccines.id,
+        animalId: rabbits.id,
+        tagId: rabbits.tagId,
+        nickname: rabbits.nickname,
+        type: rabbitVaccines.type,
+        nextDoseDate: rabbitVaccines.nextDoseDate,
+      })
+      .from(rabbitVaccines)
+      .innerJoin(rabbits, eq(rabbits.id, rabbitVaccines.rabbitId))
+      .where(
+        and(
+          eq(rabbits.status, "activo"),
+          isNotNull(rabbitVaccines.nextDoseDate),
+          lt(rabbitVaccines.nextDoseDate, today),
+          gte(rabbitVaccines.nextDoseDate, since),
+          sql`not exists (select 1 from ${rabbitVaccines} v2 where v2.rabbit_id = ${rabbitVaccines.rabbitId} and v2.type = ${rabbitVaccines.type} and v2.date > ${rabbitVaccines.date})`,
+        ),
+      ),
+  ]);
+
+  const events: VaccineEvent[] = [
+    ...sheepRows.map((r) => ({
+      id: r.id,
+      animalKind: "oveja" as const,
+      animalId: r.animalId,
+      animalLabel: labelFor(r.tagId, r.nickname),
+      type: r.type,
+      nextDoseDate: r.nextDoseDate!,
+    })),
+    ...rabbitRows.map((r) => ({
+      id: r.id,
+      animalKind: "coneja" as const,
+      animalId: r.animalId,
+      animalLabel: labelFor(r.tagId, r.nickname),
+      type: r.type,
+      nextDoseDate: r.nextDoseDate!,
+    })),
+  ];
+  events.sort((a, b) => a.nextDoseDate.localeCompare(b.nextDoseDate));
+  return events;
+}
+
+// ─── Avisos urgentes (badge de Inicio) ───────────────────────────────────
+/**
+ * Nº de avisos urgentes: vacunas vencidas o en ≤3 días + partos en ≤7 días.
+ * Nunca lanza: si la BD falla devuelve 0 para no romper la navegación.
+ */
+export async function getUrgentCount(): Promise<number> {
+  try {
+    const [overdue, vaccines, births] = await Promise.all([
+      listOverdueVaccines(),
+      listUpcomingVaccines(3),
+      listUpcomingBirths(7),
+    ]);
+    return overdue.length + vaccines.length + births.length;
+  } catch {
+    return 0;
+  }
 }

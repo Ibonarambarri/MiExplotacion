@@ -45,3 +45,7 @@ next-env.d.ts
 .claude/
 .agents/
 skills-lock.json
+docs/screenshots/raw/
+
+# Base de datos local de demo (PGlite)
+/.data/

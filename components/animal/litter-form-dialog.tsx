@@ -13,13 +13,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/forms/field";
+import { toastSale } from "@/components/animal/undo-toast";
+import type { SaleSync } from "@/actions/sheep-sales";
 import type { ActionResult } from "@/actions/sheep";
 import type { Litter } from "@/db/schema";
 
 type SubmitAction = (
   prev: ActionResult | null,
   fd: FormData,
-) => Promise<ActionResult>;
+) => Promise<ActionResult<{ sale: SaleSync }>>;
 
 export function LitterFormDialog({
   open,
@@ -41,6 +43,7 @@ export function LitterFormDialog({
     const res = await action(prev, fd);
     if (res.ok) {
       toast.success("Camada guardada");
+      toastSale(res.data?.sale);
       onOpenChange(false);
     } else {
       toast.error(res.error);
@@ -52,7 +55,7 @@ export function LitterFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -154,6 +157,25 @@ export function LitterFormDialog({
                 />
               </Field>
             </div>
+          )}
+
+          {initial && (
+            <Field
+              label="Importe de venta (€)"
+              htmlFor="saleAmountEur"
+              hint="Si lo indicas, se apunta como ingreso en Finanzas."
+              error={fe?.saleAmountEur}
+            >
+              <Input
+                id="saleAmountEur"
+                name="saleAmountEur"
+                type="number"
+                step="0.01"
+                min={0}
+                inputMode="decimal"
+                defaultValue={initial?.saleAmountEur ?? ""}
+              />
+            </Field>
           )}
 
           <Field label="Observaciones" htmlFor="notes" error={fe?.notes}>

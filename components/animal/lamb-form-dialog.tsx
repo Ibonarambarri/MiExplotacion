@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
+import { ArrowUpRight, Sprout } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -14,6 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/forms/field";
+import { DeleteZone } from "@/components/animal/delete-zone";
+import { toastSale } from "@/components/animal/undo-toast";
+import type { SaleSync } from "@/actions/sheep-sales";
 import { todayIso } from "@/lib/dates";
 import { lambStatusLabels } from "@/lib/validations";
 import type { ActionResult } from "@/actions/sheep";
@@ -22,7 +27,7 @@ import type { Lamb } from "@/db/schema";
 type SubmitAction = (
   prev: ActionResult | null,
   fd: FormData,
-) => Promise<ActionResult>;
+) => Promise<ActionResult<{ sale: SaleSync }>>;
 
 export function LambFormDialog({
   open,
@@ -30,12 +35,17 @@ export function LambFormDialog({
   action,
   initial,
   title,
+  onDelete,
+  onPromote,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   action: SubmitAction;
   initial?: Lamb | null;
   title: string;
+  onDelete?: () => Promise<void>;
+  /** Solo para corderas vivas aún no pasadas al rebaño. */
+  onPromote?: () => void;
 }) {
   const [status, setStatus] = useState<string>(initial?.status ?? "vivo");
 
@@ -46,6 +56,7 @@ export function LambFormDialog({
     const res = await action(prev, fd);
     if (res.ok) {
       toast.success("Cordero guardado");
+      toastSale(res.data?.sale);
       onOpenChange(false);
     } else {
       toast.error(res.error);
@@ -57,7 +68,7 @@ export function LambFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -146,6 +157,7 @@ export function LambFormDialog({
               <Field
                 label="Precio (€)"
                 htmlFor="salePriceEur"
+                hint="Se apunta como ingreso en Finanzas."
                 error={fe?.salePriceEur}
               >
                 <Input
@@ -199,6 +211,30 @@ export function LambFormDialog({
             </Button>
           </DialogFooter>
         </form>
+        {initial?.promotedSheepId ? (
+          <Button asChild variant="secondary" className="w-full">
+            <Link href={`/ovejas/${initial.promotedSheepId}`}>
+              Ver su ficha en el rebaño
+              <ArrowUpRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </Button>
+        ) : onPromote ? (
+          <Button type="button" variant="secondary" className="w-full" onClick={onPromote}>
+            <Sprout className="h-4 w-4" aria-hidden />
+            Pasar al rebaño
+          </Button>
+        ) : null}
+        {onDelete && (
+          <DeleteZone
+            label="Eliminar cordero"
+            confirmText={
+              initial?.status === "vendido" && initial.salePriceEur
+                ? "Se quitará también su ingreso de Finanzas. Podrás deshacerlo unos segundos."
+                : undefined
+            }
+            onDelete={onDelete}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

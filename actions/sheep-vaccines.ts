@@ -1,14 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { sheepVaccines } from "@/db/schema";
+import { sheepVaccines, type SheepVaccine } from "@/db/schema";
 import { vaccineSchema, fdObject, flattenZodError } from "@/lib/validations";
 import type { ActionResult } from "@/actions/sheep";
 
 function refresh(sheepId: number) {
   revalidatePath(`/ovejas/${sheepId}`);
+  revalidatePath("/ovejas");
   revalidatePath("/");
 }
 
@@ -28,7 +29,7 @@ export async function createSheepVaccineAction(
   await db.insert(sheepVaccines).values({
     sheepId,
     date: parsed.data.date,
-    type: parsed.data.type,
+    type: parsed.data.type.trim(),
     dose: parsed.data.dose ?? null,
     nextDoseDate: parsed.data.nextDoseDate ?? null,
     vet: parsed.data.vet ?? null,
@@ -56,22 +57,48 @@ export async function updateSheepVaccineAction(
     .update(sheepVaccines)
     .set({
       date: parsed.data.date,
-      type: parsed.data.type,
+      type: parsed.data.type.trim(),
       dose: parsed.data.dose ?? null,
       nextDoseDate: parsed.data.nextDoseDate ?? null,
       vet: parsed.data.vet ?? null,
       notes: parsed.data.notes ?? null,
     })
-    .where(eq(sheepVaccines.id, vaccineId));
+    .where(and(eq(sheepVaccines.id, vaccineId), eq(sheepVaccines.sheepId, sheepId)));
   refresh(sheepId);
   return { ok: true };
 }
 
+/** Borra y devuelve la fila para poder deshacer. */
 export async function deleteSheepVaccineAction(
   sheepId: number,
   vaccineId: number,
+): Promise<ActionResult<SheepVaccine>> {
+  const [row] = await db
+    .delete(sheepVaccines)
+    .where(and(eq(sheepVaccines.id, vaccineId), eq(sheepVaccines.sheepId, sheepId)))
+    .returning();
+  refresh(sheepId);
+  return { ok: true, data: row };
+}
+
+/** Deshacer: reinserta la vacuna borrada con los mismos datos e id. */
+export async function restoreSheepVaccineAction(
+  sheepId: number,
+  row: SheepVaccine,
 ): Promise<ActionResult> {
-  await db.delete(sheepVaccines).where(eq(sheepVaccines.id, vaccineId));
+  await db
+    .insert(sheepVaccines)
+    .values({
+      id: row.id,
+      sheepId,
+      date: row.date,
+      type: row.type,
+      dose: row.dose,
+      nextDoseDate: row.nextDoseDate,
+      vet: row.vet,
+      notes: row.notes,
+    })
+    .onConflictDoNothing();
   refresh(sheepId);
   return { ok: true };
 }

@@ -1,4 +1,4 @@
--- Acienda · migración "mejoras"
+-- Mi Explotación · migración "mejoras"
 -- SOLO ADITIVA: añade columnas opcionales y tablas nuevas.
 -- No borra, no renombra y no modifica ningún dato existente.
 -- Es idempotente: se puede ejecutar varias veces sin efectos.

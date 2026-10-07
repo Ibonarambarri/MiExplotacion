@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 
-const COOKIE_NAME = "acienda_session";
+const COOKIE_NAME = "mi_explotacion_session";
 const SESSION_MAX_AGE_S = 60 * 60 * 24 * 30; // 30 días
 
 function getSecret(): string {

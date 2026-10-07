@@ -1,191 +1,299 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import {
+  Baby,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  HeartPulse,
+  Syringe,
+} from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
-import { listCalendarEvents, type CalendarEventType } from "@/lib/queries/events";
-import { formatDateEs, cn } from "@/lib/utils";
-import { CalendarGrid } from "./calendar-grid";
+import { ListGroup, ListRow, RowIcon } from "@/components/ui/list";
+import {
+  listAgendaEvents,
+  listCalendarEvents,
+  type CalendarEvent,
+  type CalendarEventType,
+} from "@/lib/queries/events";
+import { MONTHS_ES, daysBetweenIso, nowParts, relativeDayLabel } from "@/lib/dates";
+import { cn } from "@/lib/utils";
+import { CalendarGrid, EVENT_DOT } from "./calendar-grid";
+import { ViewSwitch } from "./view-switch";
 
 export const dynamic = "force-dynamic";
 
-const MONTHS_ES = [
-  "Enero",
-  "Febrero",
-  "Marzo",
-  "Abril",
-  "Mayo",
-  "Junio",
-  "Julio",
-  "Agosto",
-  "Septiembre",
-  "Octubre",
-  "Noviembre",
-  "Diciembre",
+export const metadata = { title: "Calendario" };
+
+const AGENDA_DAYS = 60;
+
+const EVENT_STYLE: Record<
+  CalendarEventType,
+  { tone: "info" | "harvest" | "success" | "destructive" | "muted"; icon: React.ReactNode; label: string }
+> = {
+  vacuna: { tone: "info", icon: <Syringe />, label: "Vacuna" },
+  vacuna_dosis: { tone: "info", icon: <Syringe />, label: "Próxima dosis" },
+  parto_esperado: { tone: "harvest", icon: <Baby />, label: "Parto esperado" },
+  parto_real: { tone: "success", icon: <Baby />, label: "Parto" },
+  enfermedad_inicio: { tone: "destructive", icon: <HeartPulse />, label: "Salud" },
+  enfermedad_fin: { tone: "muted", icon: <HeartPulse />, label: "Salud" },
+};
+
+const LEGEND: { type: CalendarEventType; label: string }[] = [
+  { type: "vacuna", label: "Vacuna" },
+  { type: "parto_esperado", label: "Parto esperado" },
+  { type: "parto_real", label: "Parto" },
+  { type: "enfermedad_inicio", label: "Salud" },
 ];
 
-const eventBadgeVariant: Record<
-  CalendarEventType,
-  "secondary" | "warning" | "success" | "destructive"
-> = {
-  vacuna: "secondary",
-  vacuna_dosis: "secondary",
-  parto_esperado: "warning",
-  parto_real: "success",
-  enfermedad_inicio: "destructive",
-  enfermedad_fin: "success",
-};
-
-const eventTypeShort: Record<CalendarEventType, string> = {
-  vacuna: "Vacuna",
-  vacuna_dosis: "Vacuna",
-  parto_esperado: "Parto esperado",
-  parto_real: "Parto",
-  enfermedad_inicio: "Salud",
-  enfermedad_fin: "Salud",
-};
-
 function clampMonth(y: number, m: number): { year: number; month: number } {
-  let year = y;
-  let month = m;
-  while (month < 1) {
-    month += 12;
-    year -= 1;
-  }
-  while (month > 12) {
-    month -= 12;
-    year += 1;
-  }
-  return { year, month };
+  const idx = y * 12 + (m - 1);
+  return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
+}
+
+function isoOf(y: number, m: number, d: number) {
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** "Miércoles, 7 de octubre" a partir de YYYY-MM-DD (sin depender de la TZ). */
+function longDateEs(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const s = new Intl.DateTimeFormat("es-ES", {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export default async function CalendarioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ y?: string; m?: string; d?: string }>;
+  searchParams: Promise<{ y?: string; m?: string; d?: string; vista?: string }>;
 }) {
   const sp = await searchParams;
-  const now = new Date();
-  const yearParam = sp.y ? Number(sp.y) : now.getFullYear();
-  const monthParam = sp.m ? Number(sp.m) : now.getMonth() + 1;
-  const { year, month } = clampMonth(yearParam, monthParam);
+  const now = nowParts();
+  const today = isoOf(now.year, now.month, now.day);
+  const vista = sp.vista === "agenda" ? "agenda" : "mes";
 
-  const events = await listCalendarEvents(year, month);
-
-  // día seleccionado
-  let selectedIso: string;
-  if (sp.d && /^\d{4}-\d{2}-\d{2}$/.test(sp.d)) {
-    selectedIso = sp.d;
-  } else if (
-    year === now.getFullYear() &&
-    month === now.getMonth() + 1
-  ) {
-    selectedIso = `${year}-${String(month).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  } else {
-    selectedIso = `${year}-${String(month).padStart(2, "0")}-01`;
-  }
-
-  const dayEvents = events.filter((e) => e.date === selectedIso);
-
-  const prev = clampMonth(year, month - 1);
-  const next = clampMonth(year, month + 1);
-
-  const hrefForMonth = (y: number, m: number) =>
-    `/calendario?y=${y}&m=${m}`;
-
-  const hrefForDay = (iso: string) =>
-    `/calendario?y=${year}&m=${month}&d=${iso}`;
+  const yParam = Number(sp.y);
+  const mParam = Number(sp.m);
+  const { year, month } = clampMonth(
+    Number.isInteger(yParam) && yParam > 1900 ? yParam : now.year,
+    Number.isInteger(mParam) && mParam !== 0 ? mParam : now.month,
+  );
+  const monthHref = `/calendario?y=${year}&m=${month}`;
 
   return (
-    <div>
+    <div className="space-y-5">
       <PageHeader
         title="Calendario"
-        description="Eventos de los animales y la explotación"
+        back={{ href: "/", label: "Inicio" }}
+        className="pb-0"
       />
-
-      <Card>
-        <CardContent className="space-y-3 p-3">
-          <div className="flex items-center justify-between">
-            <Button asChild variant="ghost" size="icon" aria-label="Mes anterior">
-              <Link href={hrefForMonth(prev.year, prev.month)} scroll={false}>
-                <ChevronLeft className="h-5 w-5" />
-              </Link>
-            </Button>
-            <div className="font-semibold">
-              {MONTHS_ES[month - 1]} {year}
-            </div>
-            <Button asChild variant="ghost" size="icon" aria-label="Mes siguiente">
-              <Link href={hrefForMonth(next.year, next.month)} scroll={false}>
-                <ChevronRight className="h-5 w-5" />
-              </Link>
-            </Button>
-          </div>
-
-          <CalendarGrid
-            year={year}
-            month={month}
-            events={events}
-            selectedIso={selectedIso}
-            hrefBuilder={hrefForDay}
-          />
-
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[11px] text-muted-foreground">
-            <Legend color="bg-sky-500" label="Vacuna" />
-            <Legend color="bg-amber-500" label="Parto esperado" />
-            <Legend color="bg-emerald-500" label="Parto" />
-            <Legend color="bg-rose-500" label="Salud" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <h2 className="mt-6 mb-2 text-lg font-semibold">
-        {formatDateEs(selectedIso)}
-      </h2>
-
-      {dayEvents.length === 0 ? (
-        <EmptyState
-          icon={<CalendarDays className="h-6 w-6" />}
-          title="Sin eventos"
-          description="No hay nada registrado para este día."
-        />
+      <ViewSwitch value={vista} monthHref={monthHref} />
+      {vista === "agenda" ? (
+        <AgendaView today={today} />
       ) : (
-        <div className="grid gap-2">
-          {dayEvents.map((e) => (
-            <Card key={e.id}>
-              <Link href={e.href} className="block hover:bg-accent/50">
-                <CardContent className="flex items-center justify-between gap-3 p-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={eventBadgeVariant[e.type]}>
-                        {eventTypeShort[e.type]}
-                      </Badge>
-                      <span className="truncate text-sm font-medium">
-                        {e.title}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {e.animalKind === "oveja" ? "Oveja" : "Coneja"} ·{" "}
-                      {e.animalLabel}
-                    </div>
-                  </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-                </CardContent>
-              </Link>
-            </Card>
-          ))}
-        </div>
+        <MonthView
+          year={year}
+          month={month}
+          today={today}
+          selectedParam={sp.d}
+          isCurrentMonth={year === now.year && month === now.month}
+        />
       )}
     </div>
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
+async function MonthView({
+  year,
+  month,
+  today,
+  selectedParam,
+  isCurrentMonth,
+}: {
+  year: number;
+  month: number;
+  today: string;
+  selectedParam?: string;
+  isCurrentMonth: boolean;
+}) {
+  const events = await listCalendarEvents(year, month);
+  const monthPrefix = isoOf(year, month, 1).slice(0, 8);
+
+  const selectedIso =
+    selectedParam && /^\d{4}-\d{2}-\d{2}$/.test(selectedParam) && selectedParam.startsWith(monthPrefix)
+      ? selectedParam
+      : isCurrentMonth
+        ? today
+        : isoOf(year, month, 1);
+
+  const dayEvents = events.filter((e) => e.date === selectedIso);
+  const prev = clampMonth(year, month - 1);
+  const next = clampMonth(year, month + 1);
+  const monthName = MONTHS_ES[month - 1];
+
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={cn("inline-block h-2 w-2 rounded-full", color)} />
-      {label}
-    </span>
+    <>
+      <section className="rounded-3xl border border-border/60 bg-card p-3 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
+        <div className="mb-2 flex items-center justify-between">
+          <MonthArrow
+            href={`/calendario?y=${prev.year}&m=${prev.month}`}
+            label={`Ir a ${MONTHS_ES[prev.month - 1]}`}
+          >
+            <ChevronLeft className="h-5 w-5" aria-hidden />
+          </MonthArrow>
+          <div className="flex flex-col items-center">
+            <h2 className="text-[17px] font-semibold capitalize" aria-live="polite">
+              {monthName} <span className="tabular text-muted-foreground">{year}</span>
+            </h2>
+            {!isCurrentMonth && (
+              <Link
+                href="/calendario"
+                replace
+                scroll={false}
+                className="text-xs font-medium text-primary active:opacity-60"
+              >
+                Volver a hoy
+              </Link>
+            )}
+          </div>
+          <MonthArrow
+            href={`/calendario?y=${next.year}&m=${next.month}`}
+            label={`Ir a ${MONTHS_ES[next.month - 1]}`}
+          >
+            <ChevronRight className="h-5 w-5" aria-hidden />
+          </MonthArrow>
+        </div>
+
+        <CalendarGrid
+          year={year}
+          month={month}
+          events={events}
+          selectedIso={selectedIso}
+          todayIso={today}
+          hrefBuilder={(iso) => `/calendario?y=${year}&m=${month}&d=${iso}`}
+        />
+
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-border/60 px-1 pt-2.5 text-xs text-muted-foreground">
+          {LEGEND.map((l) => (
+            <span key={l.type} className="inline-flex items-center gap-1.5">
+              <span className={cn("h-2 w-2 rounded-full", EVENT_DOT[l.type])} aria-hidden />
+              {l.label}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {dayEvents.length === 0 ? (
+        <section className="space-y-2">
+          <DayTitle iso={selectedIso} today={today} />
+          <EmptyState
+            icon={<CalendarDays />}
+            title="Día tranquilo"
+            description="No hay vacunas, partos ni incidencias este día."
+            className="py-8"
+          />
+        </section>
+      ) : (
+        <ListGroup title={<DayTitleText iso={selectedIso} today={today} />}>
+          {dayEvents.map((e) => (
+            <EventRow key={e.id} event={e} />
+          ))}
+        </ListGroup>
+      )}
+    </>
+  );
+}
+
+async function AgendaView({ today }: { today: string }) {
+  const events = await listAgendaEvents(AGENDA_DAYS);
+
+  if (events.length === 0) {
+    return (
+      <EmptyState
+        icon={<CalendarDays />}
+        title="Agenda despejada"
+        description={`No hay vacunas ni partos previstos en los próximos ${AGENDA_DAYS} días.`}
+      />
+    );
+  }
+
+  const groups = new Map<string, CalendarEvent[]>();
+  for (const e of events) {
+    const list = groups.get(e.date) ?? [];
+    list.push(e);
+    groups.set(e.date, list);
+  }
+
+  return (
+    <div className="space-y-5">
+      {[...groups.entries()].map(([date, list]) => (
+        <ListGroup key={date} title={<DayTitleText iso={date} today={today} />}>
+          {list.map((e) => (
+            <EventRow key={e.id} event={e} />
+          ))}
+        </ListGroup>
+      ))}
+      <p className="px-1 text-center text-xs text-muted-foreground">
+        Mostrando los próximos {AGENDA_DAYS} días
+      </p>
+    </div>
+  );
+}
+
+function MonthArrow({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      replace
+      scroll={false}
+      aria-label={label}
+      className="pressable flex h-11 w-11 items-center justify-center rounded-full text-primary active:bg-accent"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function DayTitleText({ iso, today }: { iso: string; today: string }) {
+  const diff = daysBetweenIso(today, iso);
+  const rel = Math.abs(diff) <= 1 ? relativeDayLabel(diff) : null;
+  return (
+    <>
+      {rel ? `${rel} · ` : ""}
+      {longDateEs(iso)}
+    </>
+  );
+}
+
+function DayTitle({ iso, today }: { iso: string; today: string }) {
+  return (
+    <h2 className="px-1 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <DayTitleText iso={iso} today={today} />
+    </h2>
+  );
+}
+
+function EventRow({ event: e }: { event: CalendarEvent }) {
+  const style = EVENT_STYLE[e.type];
+  return (
+    <ListRow
+      href={e.href}
+      leading={<RowIcon tone={style.tone}>{style.icon}</RowIcon>}
+      title={e.title}
+      subtitle={`${e.animalKind === "oveja" ? "Oveja" : "Coneja"} · ${e.animalLabel}`}
+    />
   );
 }

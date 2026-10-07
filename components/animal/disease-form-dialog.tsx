@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/forms/field";
+import { DeleteZone } from "@/components/animal/delete-zone";
 import { todayIso } from "@/lib/dates";
 import type { ActionResult } from "@/actions/sheep";
 import type { SheepDisease, RabbitDisease } from "@/db/schema";
@@ -29,12 +30,14 @@ export function DiseaseFormDialog({
   action,
   initial,
   title,
+  onDelete,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   action: SubmitAction;
   initial?: Dis | null;
   title: string;
+  onDelete?: () => Promise<void>;
 }) {
   const [resolved, setResolved] = useState<boolean>(initial?.resolved ?? false);
 
@@ -56,7 +59,7 @@ export function DiseaseFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -105,6 +108,7 @@ export function DiseaseFormDialog({
               <Input
                 id="medication"
                 name="medication"
+                autoComplete="off"
                 defaultValue={initial?.medication ?? ""}
               />
             </Field>
@@ -129,15 +133,15 @@ export function DiseaseFormDialog({
             />
           </Field>
 
-          <label className="flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2.5">
+          <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-input bg-card px-3 py-2">
+            <span className="text-sm font-medium">Curada / resuelta</span>
             <input
               type="checkbox"
               name="resolved"
               checked={resolved}
               onChange={(e) => setResolved(e.target.checked)}
-              className="h-4 w-4"
+              className="h-5 w-5 accent-[var(--primary)]"
             />
-            <span className="text-sm font-medium">Resuelto</span>
           </label>
 
           {resolved && (
@@ -180,6 +184,7 @@ export function DiseaseFormDialog({
             </Button>
           </DialogFooter>
         </form>
+        {onDelete && <DeleteZone label="Eliminar enfermedad" onDelete={onDelete} />}
       </DialogContent>
     </Dialog>
   );

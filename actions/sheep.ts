@@ -26,7 +26,36 @@ function normalize(input: AnimalInput) {
     deathDate: isDead ? (input.deathDate ?? null) : null,
     deathCause: isDead ? (input.deathCause ?? null) : null,
     notes: input.notes ?? null,
+    motherId: input.motherId ?? null,
   };
+}
+
+/** La madre debe existir y no puede ser el propio animal. */
+async function checkMother(
+  motherId: number | undefined,
+  selfId?: number,
+): Promise<ActionResult | null> {
+  if (motherId === undefined) return null;
+  if (motherId === selfId) {
+    return {
+      ok: false,
+      error: "Una oveja no puede ser su propia madre.",
+      fieldErrors: { motherId: "Elige otra madre" },
+    };
+  }
+  const [m] = await db
+    .select({ id: sheep.id })
+    .from(sheep)
+    .where(eq(sheep.id, motherId))
+    .limit(1);
+  if (!m) {
+    return {
+      ok: false,
+      error: "La madre elegida no existe.",
+      fieldErrors: { motherId: "Madre no encontrada" },
+    };
+  }
+  return null;
 }
 
 export async function createSheepAction(
@@ -41,15 +70,16 @@ export async function createSheepAction(
       fieldErrors: flattenZodError(parsed.error),
     };
   }
+  const motherError = await checkMother(parsed.data.motherId);
+  if (motherError) return motherError as ActionResult<{ id: number }>;
 
+  let id: number;
   try {
     const [row] = await db
       .insert(sheep)
       .values(normalize(parsed.data))
       .returning({ id: sheep.id });
-    revalidatePath("/ovejas");
-    revalidatePath("/");
-    redirect(`/ovejas/${row.id}`);
+    id = row.id;
   } catch (e: unknown) {
     if (isUniqueViolation(e)) {
       return {
@@ -60,6 +90,10 @@ export async function createSheepAction(
     }
     throw e;
   }
+  revalidatePath("/ovejas");
+  revalidatePath("/");
+  if (parsed.data.motherId) revalidatePath(`/ovejas/${parsed.data.motherId}`);
+  redirect(`/ovejas/${id}`);
 }
 
 export async function updateSheepAction(
@@ -75,16 +109,14 @@ export async function updateSheepAction(
       fieldErrors: flattenZodError(parsed.error),
     };
   }
+  const motherError = await checkMother(parsed.data.motherId, id);
+  if (motherError) return motherError;
 
   try {
     await db
       .update(sheep)
       .set({ ...normalize(parsed.data), updatedAt: new Date() })
       .where(eq(sheep.id, id));
-    revalidatePath("/ovejas");
-    revalidatePath(`/ovejas/${id}`);
-    revalidatePath("/");
-    redirect(`/ovejas/${id}`);
   } catch (e: unknown) {
     if (isUniqueViolation(e)) {
       return {
@@ -95,6 +127,10 @@ export async function updateSheepAction(
     }
     throw e;
   }
+  revalidatePath("/ovejas");
+  revalidatePath(`/ovejas/${id}`);
+  revalidatePath("/");
+  redirect(`/ovejas/${id}?tab=datos`);
 }
 
 export async function deleteSheepAction(
@@ -107,10 +143,8 @@ export async function deleteSheepAction(
 }
 
 function isUniqueViolation(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "code" in e &&
-    (e as { code?: string }).code === "23505"
-  );
+  if (typeof e !== "object" || e === null) return false;
+  const code = (e as { code?: string }).code;
+  const cause = (e as { cause?: { code?: string } }).cause?.code;
+  return code === "23505" || cause === "23505";
 }

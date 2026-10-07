@@ -1,253 +1,206 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Sprout } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ListGroup, ListRow, RowIcon } from "@/components/ui/list";
+import { ChipGroup, Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/empty-state";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { BreedingFormDialog } from "@/components/animal/breeding-form-dialog";
 import { LambFormDialog } from "@/components/animal/lamb-form-dialog";
 import { LambStatusBadge } from "@/components/animal/lamb-status-badge";
+import { PromoteLambDialog } from "@/components/animal/promote-lamb-dialog";
+import { WeightsPanel } from "@/components/animal/weights-panel";
+import { toastWithUndo } from "@/components/animal/undo-toast";
+import { useSheet } from "@/components/animal/use-sheet";
 import {
-  updateSheepBreedingAction,
-  deleteSheepBreedingAction,
   createLambAction,
   updateLambAction,
   deleteLambAction,
+  restoreLambAction,
 } from "@/actions/sheep-breedings";
-import { SHEEP_GESTATION_DAYS } from "@/lib/dates";
 import { formatDateEs, formatEur, formatKg } from "@/lib/utils";
 import type { Lamb, SheepBreeding } from "@/db/schema";
+import type { WeightPoint } from "@/lib/queries/weights";
+
+const lambName = (l: Lamb, i: number) => l.nickname || `Cordero ${i + 1}`;
+
+function lambDetail(l: Lamb): string {
+  const sex = l.gender === "macho" ? "Macho" : l.gender === "hembra" ? "Hembra" : "Sexo sin indicar";
+  if (l.status === "vendido")
+    return [sex, l.saleDate && `vendido ${formatDateEs(l.saleDate)}`, l.salePriceEur && formatEur(l.salePriceEur)]
+      .filter(Boolean)
+      .join(" · ");
+  if (l.status === "sacrificado")
+    return [sex, l.slaughterDate && formatDateEs(l.slaughterDate), l.deadWeightKg && formatKg(l.deadWeightKg)]
+      .filter(Boolean)
+      .join(" · ");
+  if (l.status === "muerto_natural")
+    return [sex, l.slaughterDate && `baja ${formatDateEs(l.slaughterDate)}`].filter(Boolean).join(" · ");
+  return sex;
+}
 
 export function BreedingClient({
   sheepId,
+  motherName,
   breeding,
   lambs,
+  lambWeights,
 }: {
   sheepId: number;
+  motherName: string;
   breeding: SheepBreeding;
   lambs: Lamb[];
+  lambWeights: Record<number, WeightPoint[]>;
 }) {
-  const [editBreedingOpen, setEditBreedingOpen] = useState(false);
-  const [askDeleteBreeding, setAskDeleteBreeding] = useState(false);
-  const [createLambOpen, setCreateLambOpen] = useState(false);
-  const [editingLamb, setEditingLamb] = useState<Lamb | null>(null);
-  const [askDeleteLamb, setAskDeleteLamb] = useState<Lamb | null>(null);
-
   const breedingId = breeding.id;
+  const [createOpen, setCreateOpen] = useState(false);
+  const edit = useSheet<Lamb>();
+  const promote = useSheet<Lamb>();
+  const [weighing, setWeighing] = useState<number | null>(lambs[0]?.id ?? null);
+  const weighed = lambs.find((l) => l.id === weighing) ?? lambs[0];
 
-  const updateBreeding = updateSheepBreedingAction.bind(
-    null,
-    sheepId,
-    breedingId,
-  );
-  const createLamb = createLambAction.bind(null, sheepId, breedingId);
+  async function removeLamb(l: Lamb) {
+    const r = await deleteLambAction(sheepId, breedingId, l.id);
+    if (!r.ok) return void toast.error(r.error);
+    edit.hide();
+    const snap = r.data;
+    toastWithUndo(
+      snap?.transactions.length ? "Cordero eliminado (y su ingreso)" : "Cordero eliminado",
+      async () =>
+        snap ? restoreLambAction(sheepId, breedingId, snap) : { ok: false, error: "Nada que deshacer" },
+    );
+  }
+
+  const canPromote = (l: Lamb) => l.gender === "hembra" && l.status === "vivo" && !l.promotedSheepId;
 
   return (
-    <>
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <Row label="Inseminación">
-            {formatDateEs(breeding.inseminationDate)}
-          </Row>
-          <Row label="Parto esperado">
-            {formatDateEs(breeding.expectedBirthDate)}
-          </Row>
-          <Row label="Parto real">
-            {breeding.actualBirthDate
-              ? formatDateEs(breeding.actualBirthDate)
-              : "Pendiente"}
-          </Row>
-          {breeding.notes && (
-            <div>
-              <div className="mb-1 text-xs font-medium text-muted-foreground">
-                Notas
-              </div>
-              <p className="whitespace-pre-wrap text-sm">{breeding.notes}</p>
-            </div>
-          )}
-          <div className="flex gap-2 pt-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setEditBreedingOpen(true)}
-              className="flex-1"
-            >
-              <Pencil className="h-4 w-4" /> Editar
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() => setAskDeleteBreeding(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <section className="mt-6">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Corderos</h2>
-          <Button size="sm" onClick={() => setCreateLambOpen(true)}>
-            <Plus className="h-4 w-4" /> Cordero
-          </Button>
-        </div>
-
-        {lambs.length === 0 ? (
-          <EmptyState
-            title="Sin corderos"
-            description="Añade los corderos cuando se produzca el parto."
-          />
-        ) : (
-          <div className="grid gap-2">
-            {lambs.map((l, i) => (
-              <Card key={l.id}>
-                <CardContent className="space-y-1 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">
-                          {l.nickname || `Cordero ${i + 1}`}
-                        </span>
-                        <LambStatusBadge status={l.status} />
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {l.gender
-                          ? l.gender === "macho"
-                            ? "Macho"
-                            : "Hembra"
-                          : "Sexo no especificado"}
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Editar"
-                        onClick={() => setEditingLamb(l)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Eliminar"
-                        onClick={() => setAskDeleteLamb(l)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-0.5 text-xs text-muted-foreground">
-                    {l.status === "sacrificado" && (
-                      <div>
-                        Sacrificado{" "}
-                        {l.slaughterDate ? formatDateEs(l.slaughterDate) : ""}
-                        {l.deadWeightKg
-                          ? ` · Peso ${formatKg(l.deadWeightKg)}`
-                          : ""}
-                      </div>
-                    )}
-                    {l.status === "vendido" && (
-                      <div>
-                        Vendido {l.saleDate ? formatDateEs(l.saleDate) : ""}
-                        {l.salePriceEur
-                          ? ` · ${formatEur(l.salePriceEur)}`
-                          : ""}
-                      </div>
-                    )}
-                    {l.status === "muerto_natural" && l.slaughterDate && (
-                      <div>Baja {formatDateEs(l.slaughterDate)}</div>
-                    )}
-                    {l.notes && <div>{l.notes}</div>}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <BreedingFormDialog
-        open={editBreedingOpen}
-        onOpenChange={setEditBreedingOpen}
-        action={updateBreeding}
-        initial={breeding}
-        title="Editar crianza"
-        gestationDays={SHEEP_GESTATION_DAYS}
-      />
-
-      <ConfirmDialog
-        open={askDeleteBreeding}
-        onOpenChange={setAskDeleteBreeding}
-        title="¿Eliminar esta crianza?"
-        description="Se borrarán también todos los corderos asociados."
-        onConfirm={async () => {
-          const r = await deleteSheepBreedingAction(sheepId, breedingId);
-          if (r.ok) {
-            toast.success("Crianza eliminada");
-            window.location.href = `/ovejas/${sheepId}`;
+    <div className="space-y-6">
+      {lambs.length === 0 ? (
+        <EmptyState
+          title="Sin corderos"
+          description={
+            breeding.actualBirthDate
+              ? "Apunta los corderos nacidos en este parto."
+              : "Cuando para, registra el parto y añade aquí los corderos."
           }
-          return r;
-        }}
-      />
+          action={
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" aria-hidden /> Añadir cordero
+            </Button>
+          }
+        />
+      ) : (
+        <ListGroup
+          title={`Corderos (${lambs.length})`}
+          action={
+            <Button size="sm" variant="ghost" className="-my-2 -mr-2 h-11 text-primary" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" aria-hidden /> Añadir
+            </Button>
+          }
+        >
+          {lambs.map((l, i) => {
+            const lastW = lambWeights[l.id]?.at(-1);
+            return (
+              <ListRow
+                key={l.id}
+                onClick={() => edit.show(l)}
+                leading={
+                  <RowIcon tone={l.gender === "hembra" ? "harvest" : l.gender === "macho" ? "info" : "muted"}>
+                    <span className="text-sm font-bold" aria-hidden>
+                      {l.gender === "hembra" ? "H" : l.gender === "macho" ? "M" : "?"}
+                    </span>
+                  </RowIcon>
+                }
+                title={lambName(l, i)}
+                subtitle={
+                  <span className="tabular">
+                    {lambDetail(l)}
+                    {lastW ? ` · ${formatKg(lastW.weightKg)}` : ""}
+                  </span>
+                }
+                trailing={
+                  l.promotedSheepId ? (
+                    <Badge variant="success">
+                      <Sprout className="h-3 w-3" aria-hidden /> En el rebaño
+                    </Badge>
+                  ) : (
+                    <LambStatusBadge status={l.status} />
+                  )
+                }
+              />
+            );
+          })}
+        </ListGroup>
+      )}
+
+      {lambs.length > 0 && weighed && (
+        <section className="space-y-3" aria-labelledby="pesajes-corderos">
+          <h2
+            id="pesajes-corderos"
+            className="px-1 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            Pesajes
+          </h2>
+          {lambs.length > 1 && (
+            <ChipGroup label="Elegir cordero">
+              {lambs.map((l, i) => (
+                <Chip key={l.id} active={l.id === weighed.id} onClick={() => setWeighing(l.id)}>
+                  {lambName(l, i)}
+                </Chip>
+              ))}
+            </ChipGroup>
+          )}
+          <WeightsPanel
+            key={weighed.id}
+            target={{ kind: "lamb", id: weighed.id }}
+            points={lambWeights[weighed.id] ?? []}
+            compact
+          />
+        </section>
+      )}
 
       <LambFormDialog
-        open={createLambOpen}
-        onOpenChange={setCreateLambOpen}
-        action={createLamb}
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        action={createLambAction.bind(null, sheepId, breedingId)}
         title="Nuevo cordero"
       />
 
-      {editingLamb && (
+      {edit.item && (
         <LambFormDialog
-          open={!!editingLamb}
-          onOpenChange={(v) => !v && setEditingLamb(null)}
-          action={updateLambAction.bind(
-            null,
-            sheepId,
-            breedingId,
-            editingLamb.id,
-          )}
-          initial={editingLamb}
-          title="Editar cordero"
+          key={edit.item.id}
+          open={edit.open}
+          onOpenChange={edit.onOpenChange}
+          action={updateLambAction.bind(null, sheepId, breedingId, edit.item.id)}
+          initial={edit.item}
+          title={`Editar ${lambName(edit.item, lambs.findIndex((l) => l.id === edit.item!.id))}`}
+          onDelete={() => removeLamb(edit.item!)}
+          onPromote={
+            canPromote(edit.item)
+              ? () => {
+                  const l = edit.item!;
+                  edit.hide();
+                  promote.show(l);
+                }
+              : undefined
+          }
         />
       )}
 
-      <ConfirmDialog
-        open={!!askDeleteLamb}
-        onOpenChange={(v) => !v && setAskDeleteLamb(null)}
-        title="¿Eliminar cordero?"
-        description={askDeleteLamb?.nickname ?? "Cordero"}
-        onConfirm={async () => {
-          if (!askDeleteLamb) return;
-          const r = await deleteLambAction(
-            sheepId,
-            breedingId,
-            askDeleteLamb.id,
-          );
-          if (r.ok) toast.success("Cordero eliminado");
-          return r;
-        }}
-      />
-    </>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-border/50 pb-2 last:border-0 last:pb-0 text-sm">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="text-right">{children}</span>
+      {promote.item && (
+        <PromoteLambDialog
+          key={promote.item.id}
+          open={promote.open}
+          onOpenChange={promote.onOpenChange}
+          sheepId={sheepId}
+          breedingId={breedingId}
+          lamb={promote.item}
+          birthDate={breeding.actualBirthDate}
+          motherName={motherName}
+        />
+      )}
     </div>
   );
 }

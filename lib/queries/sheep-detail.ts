@@ -54,7 +54,8 @@ export async function listSheepBreedings(
   const allLambs = await db
     .select()
     .from(lambs)
-    .where(inArray(lambs.breedingId, ids));
+    .where(inArray(lambs.breedingId, ids))
+    .orderBy(asc(lambs.id));
 
   const grouped: Record<number, Lamb[]> = {};
   for (const l of allLambs) {

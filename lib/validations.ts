@@ -70,6 +70,8 @@ export const animalSchema = z
     deathDate: optionalDate,
     deathCause: optionalText(),
     notes: optionalText(),
+    // Genealogía: madre dentro del rebaño (id de la misma especie).
+    motherId: optionalInt,
   })
   .refine(
     (d) => {
@@ -125,6 +127,7 @@ export const sheepBreedingSchema = z.object({
   inseminationDate: dateString,
   expectedBirthDate: optionalDate, // se autocalcula si vacío
   actualBirthDate: optionalDate,
+  sire: optionalText(64),
   notes: optionalText(),
 });
 
@@ -165,6 +168,7 @@ export const rabbitBreedingSchema = z.object({
   inseminationDate: dateString,
   expectedBirthDate: optionalDate,
   actualBirthDate: optionalDate,
+  sire: optionalText(64),
   notes: optionalText(),
 });
 export type RabbitBreedingInput = z.infer<typeof rabbitBreedingSchema>;
@@ -176,6 +180,7 @@ export const litterSchema = z.object({
   averageWeightKg: optionalDecimal,
   slaughterDate: optionalDate,
   slaughteredUnits: optionalInt,
+  saleAmountEur: optionalDecimal,
   notes: optionalText(),
 });
 export type LitterInput = z.infer<typeof litterSchema>;
@@ -218,6 +223,45 @@ export const transactionSchema = z.object({
 });
 
 export type TransactionInput = z.infer<typeof transactionSchema>;
+
+// ─── Pesajes ──────────────────────────────────────────────────────────────
+/** Acepta "12,5" o "12.5". */
+const kgString = z
+  .string()
+  .transform((v) => v.trim().replace(",", "."))
+  .refine((v) => /^\d{1,4}(\.\d{1,2})?$/.test(v) && Number(v) > 0, {
+    message: "Peso inválido (kg, máx 2 decimales)",
+  });
+
+export const weightSchema = z.object({
+  date: dateString,
+  weightKg: kgString,
+  notes: optionalText(),
+});
+export type WeightInput = z.infer<typeof weightSchema>;
+
+// ─── Matanza de camada ────────────────────────────────────────────────────
+export const litterSlaughterSchema = z.object({
+  slaughterDate: dateString,
+  slaughteredUnits: optionalInt,
+  saleAmountEur: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim().replace(",", ".") : undefined))
+    .refine((v) => v === undefined || /^\d+(\.\d{1,2})?$/.test(v), {
+      message: "Importe inválido (máx 2 decimales)",
+    }),
+});
+
+// ─── Pasar cordera al rebaño ──────────────────────────────────────────────
+export const promoteLambSchema = z.object({
+  tagId: z
+    .string()
+    .min(1, "Crotal obligatorio")
+    .max(32, "Máximo 32 caracteres")
+    .transform((v) => v.trim()),
+  nickname: optionalText(64),
+});
 
 // ─── FormData → object helper ─────────────────────────────────────────────
 export function fdObject(fd: FormData): Record<string, string> {

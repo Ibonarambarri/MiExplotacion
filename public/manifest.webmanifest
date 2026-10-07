@@ -1,32 +1,46 @@
 {
-  "name": "Acienda — Gestión ganadera",
-  "short_name": "Acienda",
-  "description": "Gestión de ovejas y conejas",
+  "id": "/",
+  "name": "Mi Explotación — Gestión ganadera",
+  "short_name": "Mi Explotación",
+  "description": "Gestiona tu explotación de ovejas y conejas: animales, vacunas, partos, calendario y cuentas.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
-  "background_color": "#ffffff",
-  "theme_color": "#1f6f3a",
+  "background_color": "#f9f7f2",
+  "theme_color": "#1a7440",
   "lang": "es-ES",
+  "dir": "ltr",
+  "categories": ["productivity", "business", "utilities"],
+  "prefer_related_applications": false,
   "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
     {
-      "src": "/icons/icon-192.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "name": "Anotar gasto",
+      "short_name": "Gasto",
+      "description": "Registrar un gasto nuevo",
+      "url": "/finanzas/nuevo?type=gasto",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "src": "/icons/icon-512.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "name": "Ovejas",
+      "short_name": "Ovejas",
+      "description": "Ver el rebaño",
+      "url": "/ovejas",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "src": "/icons/icon-maskable.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
+      "name": "Calendario",
+      "short_name": "Calendario",
+      "description": "Vacunas y partos próximos",
+      "url": "/calendario",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useEffect } from "react";
+import { useActionState, useState } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -30,6 +30,8 @@ export function BreedingFormDialog({
   initial,
   title,
   gestationDays,
+  sireLabel = "Semental / macho",
+  inseminationLabel = "Inseminación / cubrición",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -37,22 +39,17 @@ export function BreedingFormDialog({
   initial?: Br | null;
   title: string;
   gestationDays: number;
+  sireLabel?: string;
+  inseminationLabel?: string;
 }) {
   const [insem, setInsem] = useState<string>(
     initial?.inseminationDate ?? todayIso(),
   );
-  const [expected, setExpected] = useState<string>(
-    initial?.expectedBirthDate ?? addDaysIso(insem, gestationDays),
+  // Fecha prevista: se deriva de la inseminación salvo que el usuario la toque.
+  const [manualExpected, setManualExpected] = useState<string | null>(
+    initial?.expectedBirthDate ?? null,
   );
-  const [expectedTouched, setExpectedTouched] = useState<boolean>(
-    !!initial?.expectedBirthDate,
-  );
-
-  useEffect(() => {
-    if (!expectedTouched) {
-      setExpected(addDaysIso(insem, gestationDays));
-    }
-  }, [insem, expectedTouched, gestationDays]);
+  const expected = manualExpected ?? addDaysIso(insem, gestationDays);
 
   const [state, formAction, isPending] = useActionState<
     ActionResult | null,
@@ -72,13 +69,13 @@ export function BreedingFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="space-y-3">
           <Field
-            label="Inseminación / cubrición"
+            label={inseminationLabel}
             htmlFor="inseminationDate"
             required
             error={fe?.inseminationDate}
@@ -96,7 +93,7 @@ export function BreedingFormDialog({
           <Field
             label="Parto esperado"
             htmlFor="expectedBirthDate"
-            hint={`Calculado automáticamente (+${gestationDays} días). Puedes editarlo.`}
+            hint={`Se calcula solo (+${gestationDays} días). Puedes cambiarlo.`}
             error={fe?.expectedBirthDate}
           >
             <Input
@@ -104,15 +101,23 @@ export function BreedingFormDialog({
               name="expectedBirthDate"
               type="date"
               value={expected}
-              onChange={(e) => {
-                setExpected(e.target.value);
-                setExpectedTouched(true);
-              }}
+              onChange={(e) => setManualExpected(e.target.value || null)}
+            />
+          </Field>
+
+          <Field label={sireLabel} htmlFor="sire" error={fe?.sire}>
+            <Input
+              id="sire"
+              name="sire"
+              autoComplete="off"
+              defaultValue={initial?.sire ?? ""}
+              placeholder="Crotal o nombre (opcional)"
             />
           </Field>
 
           <Field
             label="Parto real"
+            hint="Déjalo vacío mientras siga gestante."
             htmlFor="actualBirthDate"
             error={fe?.actualBirthDate}
           >
