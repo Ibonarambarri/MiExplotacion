@@ -1,328 +1,199 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Pencil, Trash2, Plus, Skull, Drumstick } from "lucide-react";
+import { Drumstick, Pencil, Plus, Skull, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Stat } from "@/components/ui/stat";
 import { EmptyState } from "@/components/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { BreedingFormDialog } from "@/components/animal/breeding-form-dialog";
 import { LitterFormDialog } from "@/components/animal/litter-form-dialog";
 import { SlaughterDialog } from "@/components/animal/slaughter-dialog";
+import { WeightsPanel } from "@/components/animal/weights-panel";
+import { toastWithUndo } from "@/components/animal/undo-toast";
 import {
-  updateRabbitBreedingAction,
-  deleteRabbitBreedingAction,
   createLitterAction,
   updateLitterAction,
   deleteLitterAction,
   recordLitterDeathAction,
+  undoLitterDeathAction,
   recordLitterSlaughterAction,
 } from "@/actions/rabbit-breedings";
-import { RABBIT_GESTATION_DAYS } from "@/lib/dates";
-import { formatDateEs, formatKg } from "@/lib/utils";
+import { formatDateEs, formatEur } from "@/lib/utils";
 import type { Litter, RabbitBreeding } from "@/db/schema";
+import type { WeightPoint } from "@/lib/queries/weights";
 
 export function LitterClient({
   rabbitId,
   breeding,
   litter,
+  weights,
 }: {
   rabbitId: number;
   breeding: RabbitBreeding;
   litter: Litter | null;
+  weights: WeightPoint[];
 }) {
   const breedingId = breeding.id;
-
-  const [editBreedingOpen, setEditBreedingOpen] = useState(false);
-  const [askDeleteBreeding, setAskDeleteBreeding] = useState(false);
-  const [createLitterOpen, setCreateLitterOpen] = useState(false);
-  const [editLitterOpen, setEditLitterOpen] = useState(false);
-  const [askDeleteLitter, setAskDeleteLitter] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [askDelete, setAskDelete] = useState(false);
   const [slaughterOpen, setSlaughterOpen] = useState(false);
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
 
-  const updateBreeding = updateRabbitBreedingAction.bind(
-    null,
-    rabbitId,
-    breedingId,
-  );
-  const createLitter = createLitterAction.bind(null, rabbitId, breedingId);
-  const updateLitter = litter
-    ? updateLitterAction.bind(null, rabbitId, breedingId, litter.id)
-    : null;
-  const slaughterAction = litter
-    ? recordLitterSlaughterAction.bind(null, rabbitId, breedingId, litter.id)
-    : null;
-
-  const canCreateLitter = !!breeding.actualBirthDate && !litter;
-
-  function handleRecordDeath() {
+  function recordDeath() {
     if (!litter) return;
+    const litterId = litter.id;
     startTransition(async () => {
-      const r = await recordLitterDeathAction(rabbitId, breedingId, litter.id);
-      if (r.ok) toast.success("Muerte natural registrada");
-      else toast.error(r.error);
+      const r = await recordLitterDeathAction(rabbitId, breedingId, litterId);
+      if (!r.ok) return void toast.error(r.error);
+      toastWithUndo("Baja natural apuntada", () =>
+        undoLitterDeathAction(rabbitId, breedingId, litterId),
+      );
     });
   }
 
+  if (!litter) {
+    return breeding.actualBirthDate ? (
+      <>
+        <EmptyState
+          title="Sin camada"
+          description="Apunta cuántos gazapos han nacido."
+          action={
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" aria-hidden /> Añadir camada
+            </Button>
+          }
+        />
+        <LitterFormDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          action={createLitterAction.bind(null, rabbitId, breedingId)}
+          title="Nueva camada"
+        />
+      </>
+    ) : (
+      <EmptyState
+        title="Aún sin parir"
+        description="Cuando registres el parto podrás añadir la camada."
+      />
+    );
+  }
+
   return (
-    <>
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <Row label="Cubrición">{formatDateEs(breeding.inseminationDate)}</Row>
-          <Row label="Parto esperado">
-            {formatDateEs(breeding.expectedBirthDate)}
-          </Row>
-          <Row label="Parto real">
-            {breeding.actualBirthDate
-              ? formatDateEs(breeding.actualBirthDate)
-              : "Pendiente"}
-          </Row>
-          {breeding.notes && (
-            <div>
-              <div className="mb-1 text-xs font-medium text-muted-foreground">
-                Notas
-              </div>
-              <p className="whitespace-pre-wrap text-sm">{breeding.notes}</p>
-            </div>
-          )}
-          <div className="flex gap-2 pt-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setEditBreedingOpen(true)}
-              className="flex-1"
-            >
-              <Pencil className="h-4 w-4" /> Editar
+    <div className="space-y-6">
+      <section className="space-y-2" aria-labelledby="camada">
+        <div className="flex items-end justify-between px-1">
+          <h2 id="camada" className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Camada
+          </h2>
+          <div className="-mr-2 flex">
+            <Button variant="ghost" size="icon" aria-label="Editar camada" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-4 w-4" />
             </Button>
             <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() => setAskDeleteBreeding(true)}
+              variant="ghost"
+              size="icon"
+              aria-label="Eliminar camada"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setAskDelete(true)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <section className="mt-6">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Camada</h2>
-          {canCreateLitter && (
-            <Button size="sm" onClick={() => setCreateLitterOpen(true)}>
-              <Plus className="h-4 w-4" /> Camada
-            </Button>
-          )}
         </div>
+        <Card className="space-y-4 p-4">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <Stat label="Vivos" value={litter.currentUnits} tone="harvest" />
+            <Stat label="Nacidos" value={litter.initialUnits} />
+            <Stat label="Bajas" value={litter.naturalDeaths} tone={litter.naturalDeaths ? "negative" : "default"} />
+          </div>
 
-        {!litter ? (
-          breeding.actualBirthDate ? (
-            <EmptyState
-              title="Sin camada"
-              description="Registra la camada con las unidades nacidas."
-              action={
-                <Button onClick={() => setCreateLitterOpen(true)}>
-                  <Plus className="h-4 w-4" /> Camada
-                </Button>
-              }
-            />
-          ) : (
-            <EmptyState
-              title="Aún sin parir"
-              description="Cuando registres el parto real podrás añadir la camada."
-            />
-          )
-        ) : (
-          <Card>
-            <CardContent className="space-y-3 p-4">
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <Stat label="Vivos" value={litter.currentUnits} />
-                <Stat label="Iniciales" value={litter.initialUnits} muted />
-                <Stat
-                  label="Bajas"
-                  value={litter.naturalDeaths}
-                  muted
-                />
-              </div>
+          {litter.slaughterDate && (
+            <div className="rounded-xl bg-muted px-3 py-2.5 text-sm">
+              <span className="font-medium">Matanza</span>{" "}
+              <span className="tabular text-muted-foreground">
+                {formatDateEs(litter.slaughterDate)} · {litter.slaughteredUnits ?? 0} gazapos
+                {litter.saleAmountEur ? ` · ${formatEur(litter.saleAmountEur)}` : ""}
+              </span>
+            </div>
+          )}
 
-              {litter.averageWeightKg && (
-                <div className="text-center text-sm text-muted-foreground">
-                  Peso medio: {formatKg(litter.averageWeightKg)}
-                </div>
-              )}
+          {litter.notes && <p className="whitespace-pre-wrap text-sm">{litter.notes}</p>}
 
-              {litter.slaughterDate && (
-                <div className="rounded-lg bg-muted p-3 text-center text-sm">
-                  <Badge variant="warning" className="mb-1">
-                    Matanza
-                  </Badge>
-                  <div>
-                    {formatDateEs(litter.slaughterDate)} ·{" "}
-                    {litter.slaughteredUnits ?? 0} unidades
-                  </div>
-                </div>
-              )}
-
-              {litter.notes && (
-                <div>
-                  <div className="mb-1 text-xs font-medium text-muted-foreground">
-                    Observaciones
-                  </div>
-                  <p className="whitespace-pre-wrap text-sm">{litter.notes}</p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRecordDeath}
-                  disabled={litter.currentUnits <= 0}
-                >
-                  <Skull className="h-4 w-4" />
-                  Muerte natural
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setSlaughterOpen(true)}
-                  disabled={litter.currentUnits <= 0}
-                >
-                  <Drumstick className="h-4 w-4" />
-                  Matanza
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditLitterOpen(true)}
-                >
-                  <Pencil className="h-4 w-4" />
-                  Editar
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAskDeleteLitter(true)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Eliminar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              onClick={recordDeath}
+              disabled={pending || litter.currentUnits <= 0}
+            >
+              <Skull className="h-4 w-4" aria-hidden />
+              Baja natural
+            </Button>
+            {litter.slaughterDate ? (
+              // Matanza ya registrada: se corrige desde "Editar camada" para no
+              // descontar dos veces las unidades.
+              <Button variant="secondary" onClick={() => setEditOpen(true)}>
+                <Drumstick className="h-4 w-4" aria-hidden />
+                Editar matanza
+              </Button>
+            ) : (
+              <Button onClick={() => setSlaughterOpen(true)} disabled={litter.currentUnits <= 0}>
+                <Drumstick className="h-4 w-4" aria-hidden />
+                Matanza
+              </Button>
+            )}
+          </div>
+        </Card>
       </section>
 
-      <BreedingFormDialog
-        open={editBreedingOpen}
-        onOpenChange={setEditBreedingOpen}
-        action={updateBreeding}
-        initial={breeding}
-        title="Editar crianza"
-        gestationDays={RABBIT_GESTATION_DAYS}
-      />
-
-      <ConfirmDialog
-        open={askDeleteBreeding}
-        onOpenChange={setAskDeleteBreeding}
-        title="¿Eliminar esta crianza?"
-        description="Se borrará también la camada asociada."
-        onConfirm={async () => {
-          const r = await deleteRabbitBreedingAction(rabbitId, breedingId);
-          if (r.ok) {
-            toast.success("Crianza eliminada");
-            window.location.href = `/conejas/${rabbitId}`;
-          }
-          return r;
-        }}
-      />
+      <section className="space-y-3" aria-labelledby="pesajes-camada">
+        <h2
+          id="pesajes-camada"
+          className="px-1 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground"
+        >
+          Peso medio de la camada
+        </h2>
+        <WeightsPanel
+          target={{ kind: "litter", id: litter.id }}
+          points={weights}
+          label="Peso medio"
+          compact
+        />
+      </section>
 
       <LitterFormDialog
-        open={createLitterOpen}
-        onOpenChange={setCreateLitterOpen}
-        action={createLitter}
-        title="Nueva camada"
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        action={updateLitterAction.bind(null, rabbitId, breedingId, litter.id)}
+        initial={litter}
+        title="Editar camada"
       />
 
-      {litter && updateLitter && (
-        <LitterFormDialog
-          open={editLitterOpen}
-          onOpenChange={setEditLitterOpen}
-          action={updateLitter}
-          initial={litter}
-          title="Editar camada"
-        />
-      )}
-
-      {litter && slaughterAction && (
-        <SlaughterDialog
-          open={slaughterOpen}
-          onOpenChange={setSlaughterOpen}
-          action={slaughterAction}
-          defaultUnits={litter.currentUnits}
-        />
-      )}
+      <SlaughterDialog
+        open={slaughterOpen}
+        onOpenChange={setSlaughterOpen}
+        action={recordLitterSlaughterAction.bind(null, rabbitId, breedingId, litter.id)}
+        defaultUnits={litter.currentUnits}
+        defaultAmount={litter.saleAmountEur}
+      />
 
       <ConfirmDialog
-        open={askDeleteLitter}
-        onOpenChange={setAskDeleteLitter}
+        open={askDelete}
+        onOpenChange={setAskDelete}
         title="¿Eliminar la camada?"
+        description={
+          litter.saleAmountEur
+            ? "Se borrarán sus pesajes y también su ingreso de venta en Finanzas. No se puede deshacer."
+            : "Se borrarán también sus pesajes. No se puede deshacer."
+        }
         onConfirm={async () => {
-          if (!litter) return;
           const r = await deleteLitterAction(rabbitId, breedingId, litter.id);
           if (r.ok) toast.success("Camada eliminada");
           return r;
         }}
       />
-    </>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-border/50 pb-2 last:border-0 last:pb-0 text-sm">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="text-right">{children}</span>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  muted,
-}: {
-  label: string;
-  value: number;
-  muted?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-lg border ${
-        muted ? "bg-muted/40" : "bg-primary/10"
-      } p-2`}
-    >
-      <div
-        className={`text-2xl font-semibold ${
-          muted ? "text-muted-foreground" : "text-primary"
-        }`}
-      >
-        {value}
-      </div>
-      <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );
 }

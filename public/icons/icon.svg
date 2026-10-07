@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a8b52"/>
+      <stop offset="1" stop-color="#145c33"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.18" r="0.8">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#glow)"/>
+  <g transform="translate(256 256) scale(0.95) translate(-250 -280)">
+  <g>
+    <!-- Sombra en el suelo -->
+    <ellipse cx="262" cy="398" rx="130" ry="14" fill="#000" opacity="0.14"/>
+    <!-- Patas -->
+    <rect x="198" y="318" width="30" height="80" rx="15" fill="#0d2a19"/>
+    <rect x="300" y="318" width="30" height="80" rx="15" fill="#0d2a19"/>
+    <!-- Lana: nube de círculos -->
+    <g fill="#ffffff">
+      <circle cx="196" cy="262" r="58"/>
+      <circle cx="244" cy="206" r="62"/>
+      <circle cx="312" cy="200" r="60"/>
+      <circle cx="366" cy="248" r="56"/>
+      <circle cx="350" cy="306" r="52"/>
+      <circle cx="286" cy="322" r="54"/>
+      <circle cx="222" cy="316" r="50"/>
+      <ellipse cx="280" cy="262" rx="110" ry="80"/>
+    </g>
+    <!-- Volumen sutil en la parte baja de la lana -->
+    <path d="M176 300 q40 52 110 52 q70 0 104 -46 q-10 46 -60 62 q-30 10 -60 4 q-30 8 -62 -6 q-30 -14 -32 -66z" fill="#e6efe8"/>
+    <!-- Cabeza -->
+    <g transform="rotate(-14 150 250)">
+      <ellipse cx="150" cy="262" rx="46" ry="60" fill="#10331f"/>
+      <!-- Oreja -->
+      <ellipse cx="104" cy="226" rx="30" ry="14" transform="rotate(-24 104 226)" fill="#10331f"/>
+      <!-- Mechón de lana sobre la frente -->
+      <circle cx="150" cy="208" r="30" fill="#ffffff"/>
+      <circle cx="176" cy="216" r="22" fill="#ffffff"/>
+      <!-- Ojo -->
+      <circle cx="138" cy="256" r="7.5" fill="#ffffff"/>
+    </g>
+  </g>
+  </g>
+</svg>

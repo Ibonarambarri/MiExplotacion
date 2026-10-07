@@ -1,73 +1,250 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-@theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(20 14.3% 4.1%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(20 14.3% 4.1%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(20 14.3% 4.1%);
-  --color-primary: hsl(142 60% 32%);
-  --color-primary-foreground: hsl(0 0% 100%);
-  --color-secondary: hsl(60 4.8% 95.9%);
-  --color-secondary-foreground: hsl(24 9.8% 10%);
-  --color-muted: hsl(60 4.8% 95.9%);
-  --color-muted-foreground: hsl(25 5.3% 44.7%);
-  --color-accent: hsl(60 4.8% 95.9%);
-  --color-accent-foreground: hsl(24 9.8% 10%);
-  --color-destructive: hsl(0 72% 51%);
-  --color-destructive-foreground: hsl(60 9.1% 97.8%);
-  --color-border: hsl(20 5.9% 90%);
-  --color-input: hsl(20 5.9% 90%);
-  --color-ring: hsl(142 60% 32%);
-  --radius: 0.625rem;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Modo oscuro: sigue al sistema salvo que el usuario fije data-theme. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * Paleta "cuaderno de campo": verde campo + dorado cosecha sobre crema cálido.
+ * Todos los componentes usan estos tokens semánticos, nunca hex sueltos.
+ */
+:root {
+  --background: hsl(40 33% 97%);
+  --foreground: hsl(150 25% 9%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(150 25% 9%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(150 25% 9%);
+  --primary: hsl(145 63% 28%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(40 22% 91%);
+  --secondary-foreground: hsl(150 20% 14%);
+  --muted: hsl(40 20% 92%);
+  --muted-foreground: hsl(150 6% 38%);
+  --accent: hsl(40 22% 91%);
+  --accent-foreground: hsl(150 20% 14%);
+  --harvest: hsl(38 92% 33%);
+  --harvest-foreground: hsl(0 0% 100%);
+  --harvest-soft: hsl(42 90% 92%);
+  --success: hsl(145 63% 30%);
+  --success-soft: hsl(140 50% 92%);
+  --warning: hsl(32 95% 38%);
+  --warning-soft: hsl(40 95% 91%);
+  --danger-soft: hsl(0 85% 95%);
+  --info: hsl(205 80% 40%);
+  --info-soft: hsl(205 85% 94%);
+  --destructive: hsl(0 72% 48%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(40 15% 86%);
+  --input: hsl(40 15% 84%);
+  --ring: hsl(145 63% 28%);
+  --chart-income: hsl(145 55% 38%);
+  --chart-expense: hsl(12 75% 55%);
+  --nav: hsl(40 33% 97% / 0.82);
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  @theme {
-    --color-background: hsl(20 14.3% 4.1%);
-    --color-foreground: hsl(60 9.1% 97.8%);
-    --color-card: hsl(20 14.3% 6%);
-    --color-card-foreground: hsl(60 9.1% 97.8%);
-    --color-popover: hsl(20 14.3% 6%);
-    --color-popover-foreground: hsl(60 9.1% 97.8%);
-    --color-primary: hsl(142 55% 50%);
-    --color-primary-foreground: hsl(20 14.3% 4.1%);
-    --color-secondary: hsl(12 6.5% 15.1%);
-    --color-secondary-foreground: hsl(60 9.1% 97.8%);
-    --color-muted: hsl(12 6.5% 15.1%);
-    --color-muted-foreground: hsl(24 5.4% 63.9%);
-    --color-accent: hsl(12 6.5% 15.1%);
-    --color-accent-foreground: hsl(60 9.1% 97.8%);
-    --color-destructive: hsl(0 62.8% 45%);
-    --color-destructive-foreground: hsl(60 9.1% 97.8%);
-    --color-border: hsl(12 6.5% 18%);
-    --color-input: hsl(12 6.5% 18%);
-    --color-ring: hsl(142 55% 50%);
+  :root:not([data-theme="light"]) {
+    --background: hsl(150 14% 6%);
+    --foreground: hsl(40 25% 94%);
+    --card: hsl(150 12% 10%);
+    --card-foreground: hsl(40 25% 94%);
+    --popover: hsl(150 12% 11%);
+    --popover-foreground: hsl(40 25% 94%);
+    --primary: hsl(145 55% 50%);
+    --primary-foreground: hsl(150 30% 6%);
+    --secondary: hsl(150 8% 16%);
+    --secondary-foreground: hsl(40 25% 94%);
+    --muted: hsl(150 8% 15%);
+    --muted-foreground: hsl(40 8% 64%);
+    --accent: hsl(150 8% 17%);
+    --accent-foreground: hsl(40 25% 94%);
+    --harvest: hsl(40 85% 58%);
+    --harvest-foreground: hsl(150 30% 6%);
+    --harvest-soft: hsl(40 50% 16%);
+    --success: hsl(145 55% 55%);
+    --success-soft: hsl(145 35% 15%);
+    --warning: hsl(38 90% 60%);
+    --warning-soft: hsl(38 50% 16%);
+    --danger-soft: hsl(0 45% 18%);
+    --info: hsl(205 85% 65%);
+    --info-soft: hsl(205 45% 17%);
+    --destructive: hsl(0 70% 58%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(150 8% 18%);
+    --input: hsl(150 8% 22%);
+    --ring: hsl(145 55% 50%);
+    --chart-income: hsl(145 50% 50%);
+    --chart-expense: hsl(12 80% 62%);
+    --nav: hsl(150 14% 6% / 0.8);
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --background: hsl(150 14% 6%);
+  --foreground: hsl(40 25% 94%);
+  --card: hsl(150 12% 10%);
+  --card-foreground: hsl(40 25% 94%);
+  --popover: hsl(150 12% 11%);
+  --popover-foreground: hsl(40 25% 94%);
+  --primary: hsl(145 55% 50%);
+  --primary-foreground: hsl(150 30% 6%);
+  --secondary: hsl(150 8% 16%);
+  --secondary-foreground: hsl(40 25% 94%);
+  --muted: hsl(150 8% 15%);
+  --muted-foreground: hsl(40 8% 64%);
+  --accent: hsl(150 8% 17%);
+  --accent-foreground: hsl(40 25% 94%);
+  --harvest: hsl(40 85% 58%);
+  --harvest-foreground: hsl(150 30% 6%);
+  --harvest-soft: hsl(40 50% 16%);
+  --success: hsl(145 55% 55%);
+  --success-soft: hsl(145 35% 15%);
+  --warning: hsl(38 90% 60%);
+  --warning-soft: hsl(38 50% 16%);
+  --danger-soft: hsl(0 45% 18%);
+  --info: hsl(205 85% 65%);
+  --info-soft: hsl(205 45% 17%);
+  --destructive: hsl(0 70% 58%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(150 8% 18%);
+  --input: hsl(150 8% 22%);
+  --ring: hsl(145 55% 50%);
+  --chart-income: hsl(145 50% 50%);
+  --chart-expense: hsl(12 80% 62%);
+  --nav: hsl(150 14% 6% / 0.8);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-harvest: var(--harvest);
+  --color-harvest-foreground: var(--harvest-foreground);
+  --color-harvest-soft: var(--harvest-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-income: var(--chart-income);
+  --color-chart-expense: var(--chart-expense);
+  --color-nav: var(--nav);
+  --radius: 0.875rem;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ─── Base móvil (tacto nativo) ─────────────────────────────────────────── */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
 }
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
-  background: var(--color-background);
-  color: var(--color-foreground);
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
+  font-feature-settings: "ss01", "cv11";
 }
 
 * {
-  border-color: var(--color-border);
+  border-color: var(--border);
 }
 
 input,
 textarea,
 select {
-  font-size: 16px; /* prevent iOS zoom */
+  font-size: 16px; /* evita el zoom de iOS al enfocar */
+}
+
+button,
+a,
+[role="button"],
+[role="tab"],
+label {
+  touch-action: manipulation;
+}
+
+button,
+[role="button"],
+[role="tab"],
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Feedback inmediato al pulsar cualquier elemento marcado como "pressable". */
+.pressable {
+  transition:
+    transform 140ms var(--ease-out-quint),
+    background-color 140ms ease,
+    opacity 140ms ease;
+}
+.pressable:active {
+  transform: scale(0.97);
+}
+
+/* Cifras alineadas para importes, fechas y contadores. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scroll horizontal sin barra (chips, tabs). */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* View Transitions entre pantallas (Next 16 + React 19). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: var(--ease-out-quint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .pressable:active {
+    transform: none;
+  }
 }

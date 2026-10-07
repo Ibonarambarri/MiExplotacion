@@ -30,3 +30,26 @@ export async function listRabbitOptions(): Promise<AnimalOption[]> {
     label: r.nickname ? `${r.nickname} (${r.tagId})` : r.tagId,
   }));
 }
+
+/**
+ * Posibles madres (misma especie, cualquier estado) para el formulario de
+ * alta/edición. Excluye al propio animal.
+ */
+export async function listMotherOptions(
+  kind: "oveja" | "coneja",
+  excludeId?: number,
+): Promise<AnimalOption[]> {
+  const t = kind === "oveja" ? sheep : rabbits;
+  const rows = await db
+    .select({ id: t.id, tagId: t.tagId, nickname: t.nickname, status: t.status })
+    .from(t)
+    .orderBy(asc(t.tagId));
+  return rows
+    .filter((r) => r.id !== excludeId)
+    .map((r) => ({
+      id: r.id,
+      label:
+        (r.nickname ? `${r.nickname} (${r.tagId})` : r.tagId) +
+        (r.status !== "activo" ? " · baja" : ""),
+    }));
+}

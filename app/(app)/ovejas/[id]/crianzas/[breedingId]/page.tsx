@@ -1,10 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/page-header";
-import { getSheepById } from "@/lib/queries/sheep";
+import { BackLink } from "@/components/animal/back-link";
+import { BreedingSummary } from "@/components/animal/breeding-summary";
+import { getSheepLabel } from "@/lib/queries/sheep";
 import { getSheepBreeding } from "@/lib/queries/sheep-detail";
+import { listLambWeights } from "@/lib/queries/weights";
+import { getGestationDays } from "@/lib/settings";
+import { formatDateEs } from "@/lib/utils";
 import { BreedingClient } from "./breeding-client";
 
 export const dynamic = "force-dynamic";
@@ -17,34 +18,42 @@ export default async function CrianzaPage({
   const { id, breedingId } = await params;
   const sheepId = Number(id);
   const brId = Number(breedingId);
-  if (!Number.isFinite(sheepId) || !Number.isFinite(brId)) notFound();
+  if (!Number.isInteger(sheepId) || !Number.isInteger(brId)) notFound();
 
-  const [animal, breeding] = await Promise.all([
-    getSheepById(sheepId),
+  const [animal, breeding, gestationDays] = await Promise.all([
+    getSheepLabel(sheepId),
     getSheepBreeding(brId),
+    getGestationDays("oveja"),
   ]);
   if (!animal || !breeding || breeding.sheepId !== sheepId) notFound();
+  const lambWeights = await listLambWeights(breeding.lambs.map((l) => l.id));
+  const backHref = `/ovejas/${sheepId}?tab=crias`;
 
   return (
-    <div>
-      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1 h-8 px-2">
-        <Link href={`/ovejas/${sheepId}`}>
-          <ChevronLeft className="h-4 w-4" />
-          {animal.nickname || animal.tagId}
-        </Link>
-      </Button>
+    <div className="space-y-6">
+      <div>
+        <BackLink href={backHref} label={animal.label} />
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {breeding.actualBirthDate
+            ? `Parto del ${formatDateEs(breeding.actualBirthDate)}`
+            : "Crianza en curso"}
+        </h1>
+      </div>
 
-      <PageHeader
-        title="Crianza"
-        description={
-          breeding.actualBirthDate ? "Parida" : "Pendiente de parto"
-        }
+      <BreedingSummary
+        kind="oveja"
+        animalId={sheepId}
+        breeding={breeding}
+        gestationDays={gestationDays}
+        backHref={backHref}
       />
 
       <BreedingClient
         sheepId={sheepId}
+        motherName={animal.label}
         breeding={breeding}
         lambs={breeding.lambs}
+        lambWeights={lambWeights}
       />
     </div>
   );
