@@ -16,7 +16,7 @@ export const NativeSelect = React.forwardRef<
       <select
         ref={ref}
         className={cn(
-          "h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-9 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+          "h-11 w-full appearance-none rounded-xl border border-input bg-card px-3 pr-9 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}
         {...props}

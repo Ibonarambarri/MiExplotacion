@@ -10,6 +10,8 @@ import {
   boolean,
   pgEnum,
   index,
+  jsonb,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -55,6 +57,13 @@ export const sheep = pgTable(
     tagId: varchar("tag_id", { length: 32 }).notNull().unique(),
     nickname: varchar("nickname", { length: 64 }),
     birthDate: date("birth_date"),
+    // Genealogía: madre dentro del rebaño (si nació aquí).
+    motherId: integer("mother_id").references((): AnyPgColumn => sheep.id, {
+      onDelete: "set null",
+    }),
+    // Fotos como data URL WebP comprimidas en el cliente (sin servicio externo).
+    photo: text("photo"),
+    photoThumb: text("photo_thumb"),
     status: animalStatusEnum("status").notNull().default("activo"),
     deathDate: date("death_date"),
     deathCause: text("death_cause"),
@@ -112,6 +121,8 @@ export const sheepBreedings = pgTable("sheep_breedings", {
   inseminationDate: date("insemination_date").notNull(),
   expectedBirthDate: date("expected_birth_date").notNull(),
   actualBirthDate: date("actual_birth_date"),
+  // Macho / semental usado (texto libre: crotal o nombre).
+  sire: varchar("sire", { length: 64 }),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -130,6 +141,10 @@ export const lambs = pgTable("lambs", {
   deadWeightKg: numeric("dead_weight_kg", { precision: 6, scale: 2 }),
   saleDate: date("sale_date"),
   salePriceEur: numeric("sale_price_eur", { precision: 10, scale: 2 }),
+  // Si la cordera se queda en el rebaño, ficha de oveja creada a partir de ella.
+  promotedSheepId: integer("promoted_sheep_id").references(() => sheep.id, {
+    onDelete: "set null",
+  }),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -144,6 +159,11 @@ export const rabbits = pgTable(
     tagId: varchar("tag_id", { length: 32 }).notNull().unique(),
     nickname: varchar("nickname", { length: 64 }),
     birthDate: date("birth_date"),
+    motherId: integer("mother_id").references((): AnyPgColumn => rabbits.id, {
+      onDelete: "set null",
+    }),
+    photo: text("photo"),
+    photoThumb: text("photo_thumb"),
     status: animalStatusEnum("status").notNull().default("activo"),
     deathDate: date("death_date"),
     deathCause: text("death_cause"),
@@ -201,6 +221,8 @@ export const rabbitBreedings = pgTable("rabbit_breedings", {
   inseminationDate: date("insemination_date").notNull(),
   expectedBirthDate: date("expected_birth_date").notNull(),
   actualBirthDate: date("actual_birth_date"),
+  // Macho / semental usado (texto libre: crotal o nombre).
+  sire: varchar("sire", { length: 64 }),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -218,6 +240,8 @@ export const litters = pgTable("litters", {
   averageWeightKg: numeric("average_weight_kg", { precision: 6, scale: 2 }),
   slaughterDate: date("slaughter_date"),
   slaughteredUnits: integer("slaughtered_units"),
+  // Importe de la venta de la matanza (genera un ingreso en finanzas).
+  saleAmountEur: numeric("sale_amount_eur", { precision: 10, scale: 2 }),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -241,6 +265,13 @@ export const transactions = pgTable(
     rabbitId: integer("rabbit_id").references(() => rabbits.id, {
       onDelete: "set null",
     }),
+    // Origen automático: venta de cordero o matanza de camada.
+    lambId: integer("lamb_id").references(() => lambs.id, {
+      onDelete: "set null",
+    }),
+    litterId: integer("litter_id").references(() => litters.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -250,6 +281,55 @@ export const transactions = pgTable(
     index("transactions_type_idx").on(t.type),
   ],
 );
+
+// ─── Weights ──────────────────────────────────────────────────────────────
+// Pesajes de cualquier animal: oveja, coneja, cordero o camada (peso medio).
+export const weightRecords = pgTable(
+  "weight_records",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date").notNull(),
+    weightKg: numeric("weight_kg", { precision: 6, scale: 2 }).notNull(),
+    sheepId: integer("sheep_id").references(() => sheep.id, {
+      onDelete: "cascade",
+    }),
+    rabbitId: integer("rabbit_id").references(() => rabbits.id, {
+      onDelete: "cascade",
+    }),
+    lambId: integer("lamb_id").references(() => lambs.id, {
+      onDelete: "cascade",
+    }),
+    litterId: integer("litter_id").references(() => litters.id, {
+      onDelete: "cascade",
+    }),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("weight_records_date_idx").on(t.date)],
+);
+
+// ─── Push notifications ───────────────────────────────────────────────────
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── App settings (clave → valor JSON) ────────────────────────────────────
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 // ─── Relations ────────────────────────────────────────────────────────────
 export const sheepRelations = relations(sheep, ({ many }) => ({
@@ -372,3 +452,8 @@ export type NewLitter = typeof litters.$inferInsert;
 
 export type Transaction = typeof transactions.$inferSelect;
 export type NewTransaction = typeof transactions.$inferInsert;
+
+export type WeightRecord = typeof weightRecords.$inferSelect;
+export type NewWeightRecord = typeof weightRecords.$inferInsert;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type AppSetting = typeof appSettings.$inferSelect;
